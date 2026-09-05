@@ -27,8 +27,14 @@ ZISPIS_FIELD_MAP = {
     "first_name": "firstName",
     "last_name": "lastName",
     "dob": "dateOfBirth",
-    "location_name": "location/ward",
-    "location_code": "location/ward",
+    # openIMIS resolves an individual's location by joining tblLocations on
+    # LocationName AND LocationCode with LocationType='V', so whatever is mapped here
+    # has to be the VILLAGE level. CWAC is ZISPIS's finest grain, so that is the only
+    # candidate; `ward` sits a level above and is kept below as a plain attribute.
+    # `location_code` is NOT mapped - ZISPIS has no location code, and reusing the name
+    # as the code lets two same-named CWACs under different wards both satisfy the join,
+    # which duplicates the individual. ZispisAdapter derives a qualified code instead.
+    "location_name": "location/cwac",
 
     # -- harmonized - present on BOTH the NSR and ZISPIS sides of the workbook --
     "sex": "gender",
