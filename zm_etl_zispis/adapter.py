@@ -80,7 +80,12 @@ class ZispisAdapter(BaseMappingAdapter):
         if note:
             # Surfaced rather than silently dropped: a person whose only identifier is
             # unusable still belongs in the registry, flagged for a caseworker.
-            record["linkage_note"] = note
+            #
+            # Deliberately NOT `linkage_note`: the sink writes that key for its own
+            # identity decisions, and it would overwrite this one - losing exactly the
+            # explanation the checker needs. A placeholder national id is *why* an id
+            # matches two hundred people, so the two notes have to survive together.
+            record["data_quality_note"] = note
 
         return record
 

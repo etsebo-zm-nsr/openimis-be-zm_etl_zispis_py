@@ -176,6 +176,9 @@ DEFAULT_CONFIG = {
         # ~2% of dateOfBirth values are impossible (years 0002, 0005, 1091). Those
         # resolve to None rather than being asserted as fact.
         "min_year": 1900,
+        # ZispisAdapter attaches this in code, to flagged rows only. Declared so
+        # `etl_check_schema` counts it - see the adapter's clean_national_id().
+        "extra_columns": ["data_quality_note"],
     },
     "sink": {
         "lookup_field": "json_ext__external_id",
