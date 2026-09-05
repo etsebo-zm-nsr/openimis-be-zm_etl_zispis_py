@@ -1,69 +1,195 @@
+"""ZISPIS connector configuration.
+
+Mapped against the live ZISPIS Beneficiary API v2 (`POST /api/v2/beneficiaries/search`),
+verified record-by-record: every path below resolves on real data.
+
+SCOPE. Only fields present in the NSR/ZISPIS mapping workbook are imported - the
+harmonized questionnaire plus the ZISPIS-specific questions. The API also returns
+payments, status history, photographs, next-of-kin, derived `assessment.calc.*`
+counters and programme flags; those are deliberately NOT mapped. Identity and household
+structure (beneficiaryId, householdId, householdRole, gender, dateOfBirth, nationalId)
+are mapped regardless, because without them there is no person to register.
+
+Everything here is runtime configuration: it ships as DEFAULT_CONFIG and is overridden
+per deployment through the Django admin, never through a migration.
+"""
 from django.apps import AppConfig
 
 MODULE_NAME = "zm_etl_zispis"
 
 # Rights are per-connector so access can be granted per source rather than
-# "may trigger every ETL in the system". Malawi's msr_etl reuses api_etl's 953001/953002
-# for exactly this reason and loses that distinction.
+# "may trigger every ETL in the system".
 ZISPIS_TRIGGER_RIGHT = "953101"
+
+# target registry column -> ZISPIS API path ("a/b/c" resolves nested objects)
+ZISPIS_FIELD_MAP = {
+    # -- base fields (required by individual_base_fields) --
+    "first_name": "firstName",
+    "last_name": "lastName",
+    "dob": "dateOfBirth",
+    "location_name": "location/ward",
+    "location_code": "location/ward",
+
+    # -- harmonized - present on BOTH the NSR and ZISPIS sides of the workbook --
+    "sex": "gender",
+    "phone": "phoneNumber",
+    "province": "location/province",
+    "district": "location/district",
+    "constituency": "location/constituency",
+    "ward": "location/ward",
+    "roof_material": "assessment/dwelling/roofMaterial",
+    "wall_material": "assessment/dwelling/wallMaterial",
+    "floor_material": "assessment/dwelling/floorMaterial",
+    "cooking_energy": "assessment/energy/cookingEnergy",
+    "lighting_energy": "assessment/energy/lightingEnergy",
+    "agriland_cultivated": "assessment/land/agriLandCultivated",
+    "educated_level": "assessment/education/educatedLevel",
+    "school_attendance": "assessment/education/schoolAttendance",
+    "bursary": "assessment/education/bursary",
+    "disability": "vulnerability/hasDisability",
+
+    # -- ZISPIS-specific - geography and dwelling --
+    "acc": "location/acc",
+    "cwac": "location/cwac",
+    "street_name": "location/address/street",
+    "house_number": "location/address/houseNumber",
+
+    # -- ZISPIS-specific - vulnerability --
+    "orphanhood": "vulnerability/orphanhood",
+    "disability_degree": "vulnerability/disability/degree",
+    "disability_cert_type": "vulnerability/disability/certificateType",
+    "critical_illness": "vulnerability/chronicIllness/present",
+    "critical_illness_cert": "vulnerability/chronicIllness/criticalCert",
+    "critical_illness_cert_number": "vulnerability/chronicIllness/criticalCertNum",
+    "fit_for_work": "vulnerability/ableBodied",
+
+    # -- ZISPIS-specific - education --
+    "school_level": "assessment/education/schoolLevel",
+    "school_type": "assessment/education/schoolType",
+    "school_name": "assessment/education/schoolName",
+    "girls_in_school": "assessment/education/girlsInSchool",
+    "qualifies_secondary_school": "assessment/education/qualifySecondarySchool",
+    "bursary_status": "assessment/education/bursaryStatus",
+
+    # -- ZISPIS-specific - food security --
+    "meals_per_day": "assessment/foodSecurity/mealsPerDay",
+    "food_insecurity": "assessment/foodSecurity/foodInsecurity",
+    "slept_hungry": "assessment/foodSecurity/sleptHungry",
+    "no_food_day_and_night": "assessment/foodSecurity/noFoodDayAndNight",
+
+    # -- ZISPIS-specific - land and livestock --
+    "agriland_owned": "assessment/land/agriLandOwned",
+    "owns_livestock": "assessment/livestock/ownsLivestock",
+    "n_poultry": "assessment/livestock/poultrySize",
+
+    # -- ZISPIS-specific - durable assets (PMT inputs) --
+    "asset_clock": "assessment/assets/hasClock",
+    "asset_computer": "assessment/assets/hasComputer",
+    "asset_radio": "assessment/assets/hasRadio",
+    "asset_electric_iron": "assessment/assets/hasElectricIron",
+    "asset_television": "assessment/assets/hasTelevision",
+    "asset_bicycle": "assessment/assets/hasBicycle",
+    "asset_bed": "assessment/assets/hasBed",
+    "asset_mattress": "assessment/assets/hasMattress",
+    "asset_sofa_lounge_suit": "assessment/assets/hasSofaLoungeSuit",
+    "asset_chair": "assessment/assets/hasChair",
+    "asset_table": "assessment/assets/hasTable",
+    "asset_ox_cart": "assessment/assets/hasOxCart",
+    "asset_plough": "assessment/assets/hasPlough",
+    "asset_oxdrawn_harrow": "assessment/assets/oxdrawnHarrow",
+    "asset_hammer_mill": "assessment/assets/hammerMill",
+    "asset_treadle": "assessment/assets/treadle",
+    "asset_axe": "assessment/assets/hasAxe",
+    "asset_fishnet": "assessment/assets/hasFishNet",
+    "asset_hoe": "assessment/assets/hasHoe",
+}
 
 DEFAULT_CONFIG = {
     "enabled": True,
     "auth": {
         "type": "basic",
         "username": "",
-        # Never store a real credential here - ModuleConfiguration.config is a plain
-        # TextField that lands in every DB backup. "env:NAME" reads from the process env.
+        # Never a real credential here - ModuleConfiguration.config lands in every DB
+        # backup. "env:NAME" reads from the process environment instead.
         "password": "env:ZISPIS_API_PASSWORD",
     },
     "source": {
-        "http_method": "GET",
+        # Filters are a JSON document, not a query string.
+        "http_method": "POST",
+        "request_style": "json_body",
         "url": "",
-        "batch_size": 200,
+        # Sent on every request. `createdAt` sorting is NOT cosmetic: paging by
+        # lastName returns the same record on multiple pages (18.8% duplicates measured
+        # over 2,000 records) because it has heavy ties and no deterministic tie-break,
+        # which means a similar share is never returned at all. createdAt is
+        # high-cardinality and measured 0% duplicates.
+        "body": {
+            "sort": ["createdAt:desc"],
+            "includeAssessment": True,
+            "includeTotal": True,
+        },
+        "page_param": "page",
+        "page_size_param": "pageSize",
+        "first_page": 1,                 # page:0 -> 400 INVALID_PAGE
+        "batch_size": 200,               # hard API maximum; 201+ -> 400 INVALID_PAGE_SIZE
         "timeout_seconds": 120,
         "retry_total": 3,
         "retry_backoff_factor": 1.0,
         "verify_ssl": True,
-        # Government APIs often present a custom or self-signed certificate.
         "ca_bundle_path": "",
-        "offset_param": "offset",
-        "limit_param": "limit",
         "response": {
-            "rows_key": "rows",
+            "rows_key": "data",
+            "has_more_key": "pagination/hasMore",
             "status_key": None,
             "message_key": "message",
         },
     },
     "adapter": {
-        "field_map": {
-            "first_name": "firstName",
-            "last_name": "lastName",
-            "dob": "dateOfBirth",
-            "location_name": "locationName",
-            "location_code": "locationCode",
-        },
-        "external_id_field": "id",
+        "field_map": ZISPIS_FIELD_MAP,
+        "external_id_field": "beneficiaryId",
         "external_id_prefix": "zispis:",
+        # ZISPIS's household key is the main next-of-kin's NRC (it equals
+        # nextOfKinMain.nationalId for ~98% of records), so it changes if that NRC is
+        # corrected upstream - see the data-quality doc.
         "group_code_field": "householdId",
         "group_code_prefix": "zm-hh-zispis:",
-        "role_field": "relationship",
+        "role_field": "householdRole",
+        # Gender-dependent roles are resolved in ZispisAdapter.map_role; this covers the
+        # values that need no gender to disambiguate.
         "role_map": {
-            "head": "HEAD", "spouse": "SPOUSE", "son": "SON", "daughter": "DAUGHTER",
-            "other relative": "OTHER_RELATIVE", "not related": "NOT_RELATED",
+            "HEAD": "HEAD",
+            "HUSBAND_OR_WIFE": "SPOUSE",
+            "NON_RELATIVE": "NOT_RELATED",
+            "DAUGHTER": "DAUGHTER",
+            "NEPHEW_OR_NIECE": "OTHER_RELATIVE",
+            "COUSIN": "OTHER_RELATIVE",
+            "STEPCHILD": "OTHER_RELATIVE",
+            "BROTHER_IN_LAW_OR_SISTER_IN_LAW": "OTHER_RELATIVE",
+            "SON_IN_LAW_OR_DAUGHTER_IN_LAW": "OTHER_RELATIVE",
+            "OTHER_RELATIVE": "OTHER_RELATIVE",
         },
-        "recipient_field": "isRecipient",
-        "national_id_field": "nrc",
-        "date_formats": ["%Y-%m-%d", "%d/%m/%Y"],
+        # ZISPIS names one recipient per household via householdRole == HEAD.
+        "recipient_field": "householdRole",
+        "national_id_field": "nationalId",
+        "national_id_type_field": "nationalIdType",
+        "date_formats": ["%Y-%m-%d"],    # plus the ISO fallback in the core
+        # ~2% of dateOfBirth values are impossible (years 0002, 0005, 1091). Those
+        # resolve to None rather than being asserted as fact.
+        "min_year": 1900,
     },
     "sink": {
         "lookup_field": "json_ext__external_id",
         "update_existing": True,
     },
     "incremental": {
+        # MUST stay disabled. The search body accepts no timestamp filter, and unknown
+        # keys are accepted with 200 and SILENTLY IGNORED - a watermark of year 2099
+        # still returns all 100,000 records. Enabling this would look like incremental
+        # sync while full-pulling nightly.
         "enabled": False,
-        "mode": "query_param",
-        "cursor_field": "lastModified",
-        "cursor_param": "updatedSince",
+        "mode": "none",
+        "cursor_field": None,
+        "cursor_param": None,
         "overlap_minutes": 15,
     },
     "provenance": {
