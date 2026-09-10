@@ -32,6 +32,14 @@ PLACEHOLDER_ID_PREFIX = "999999"
 # tblLocations.LocationCode is CharField(max_length=50).
 LOCATION_CODE_MAX = 50
 
+# Where a record's date of birth came from. Written to every row, so "reported" is an
+# assertion rather than merely the absence of a flag.
+DOB_REPORTED = "reported"
+DOB_DERIVED = "derived_from_year_of_birth"
+# Mid-year, so a derived date is on average closest to the truth and is visibly not a
+# real birthday (a 1 January cluster reads as fact and skews age-banded targeting).
+DERIVED_DOB_MONTH_DAY = "-07-01"
+
 
 class ZispisAdapter(BaseMappingAdapter):
 
@@ -91,6 +99,33 @@ class ZispisAdapter(BaseMappingAdapter):
         digest = hashlib.blake2s(code.encode("utf-8"), digest_size=6).hexdigest()
         return f"{code[:LOCATION_CODE_MAX - len(digest) - 1]}-{digest}"
 
+    def resolve_dob(self, row, mapped_dob):
+        """Return (dob, provenance).
+
+        ZISPIS confirmed that records with no usable date of birth must still be
+        registered - historical data predating CORE MIS often lacks one - but
+        `individual_individual.dob` is NOT NULL, so "no date" is not representable.
+        `yearOfBirth` is populated on 100% of sampled records and covers 98% of the
+        unusable dates, so it is the honest fallback.
+
+        The provenance column exists because a derived date must never be mistaken for a
+        reported one: it is accurate to within a year, which is fine for age banding and
+        wrong for anything that turns on an exact birthday.
+        """
+        if mapped_dob:
+            return mapped_dob, DOB_REPORTED
+        year = self.resolve_path(row, "yearOfBirth")
+        try:
+            year = int(str(year).strip()[:4])
+        except (TypeError, ValueError):
+            return None, DOB_REPORTED
+        derived = self.parse_date(f"{year}{DERIVED_DOB_MONTH_DAY}")
+        if not derived:
+            # Fails the same plausibility window as any other date - a yearOfBirth of
+            # 0002 is no more usable than a dateOfBirth of 0002.
+            return None, DOB_REPORTED
+        return derived, DOB_DERIVED
+
     def transform_row(self, row):
         # map_role needs gender, which the base class does not pass down. Held per row
         # rather than threaded through the signature so the core SPI stays unchanged.
@@ -103,6 +138,7 @@ class ZispisAdapter(BaseMappingAdapter):
             return None
 
         record["location_code"] = self.location_code(row)
+        record["dob"], record["dob_source"] = self.resolve_dob(row, record.get("dob"))
 
         national_id, note = self.clean_national_id(self.resolve_path(row, "nationalId"))
         record["national_id"] = self.normalise_national_id(national_id)

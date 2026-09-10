@@ -38,6 +38,13 @@ ZISPIS_FIELD_MAP = {
 
     # -- harmonized - present on BOTH the NSR and ZISPIS sides of the workbook --
     "sex": "gender",
+    # ZISPIS uses yearOfBirth to derive age; `age` itself is a frozen snapshot from
+    # registration. Imported because it is the fallback when dateOfBirth is unusable
+    # (see ZispisAdapter.resolve_dob) and a component of the identity key.
+    "year_of_birth": "yearOfBirth",
+    # ACTIVE / SUSPENDED / GRADUATED. A suspended head is still a member of the
+    # household but the household is no longer paid, so this is not cosmetic.
+    "status": "status",
     "phone": "phoneNumber",
     "province": "location/province",
     "district": "location/district",
@@ -184,7 +191,22 @@ DEFAULT_CONFIG = {
         "min_year": 1900,
         # ZispisAdapter attaches this in code, to flagged rows only. Declared so
         # `etl_check_schema` counts it - see the adapter's clean_national_id().
-        "extra_columns": ["data_quality_note"],
+        "extra_columns": ["data_quality_note", "dob_source"],
+        # WHAT COUNTS AS THE SAME PERSON - defined here and nowhere else.
+        # Measured over 5,000 live records (collision = two different source records
+        # sharing the key):
+        #     national_id alone ............ 34% coverage, 0.94% collisions
+        #     first+last+yob+sex ........... 99.9% coverage, 0.24%
+        #     first+last+yob+sex+district .. 99.9% coverage, 0.04%   <- chosen
+        # national_id is deliberately absent: Zambia issues duplicate NRCs to different
+        # people, so it identifies nobody on its own.
+        "identity_key_fields": ["first_name", "last_name", "year_of_birth", "sex",
+                                "district"],
+        # Load everything. ZISPIS's own filters cannot be trusted - unknown filter keys
+        # return 200 and are silently ignored - so any filtering happens here, and is
+        # left open so a deployment can narrow it from the admin without a code change.
+        # e.g. {"status": ["ACTIVE"]} to import only active beneficiaries.
+        "include_when": {},
     },
     "sink": {
         "lookup_field": "json_ext__external_id",
