@@ -77,17 +77,26 @@ class ZispisAdapter(BaseMappingAdapter):
         return (text or None), flagged
 
     def location_code(self, row):
-        """A village code unique across the whole country.
+        """A village code unique across the whole country: `district/ward`.
 
-        ZISPIS publishes no location code, only names, and CWAC names repeat: MGWAZO
-        occurs under both MSADILE and MSANDILE wards. openIMIS resolves a village with
-        `LocationName = x AND LocationCode = y AND LocationType = 'V'`, so if the code
-        were just the name, that join would match two village rows and the LEFT JOIN
-        would insert the individual TWICE. Qualifying the code by its parents makes it
-        unique; the district is included because ward names repeat across districts too.
+        ZISPIS publishes no location code, only names, and ward names repeat across
+        districts - MULULU exists in both MAFINGA and NSAMA, LUANGWA in both KITWE and
+        LUNTE (36 such names in a 5,000-record sample). openIMIS resolves a village with
+        `LocationName = x AND LocationCode = y AND LocationType = 'V'`, so a bare name as
+        the code would match two village rows and the LEFT JOIN would insert the
+        individual TWICE. Qualifying by district makes it unique.
+
+        CONSTITUENCY IS DELIBERATELY NOT IN THE CODE, even though it is the ward's parent
+        tier. 52 (district, ward) pairs in that sample resolve to more than one
+        constituency - partly spelling (`MASAITI` / `MASAITI CENTRAL`, `MAZABUKA CENTRAL`
+        / `MAZUBUKA`), partly genuine boundary changes. Including it would give the SAME
+        real ward two different codes depending on which spelling a record happened to
+        carry, splitting one village into two Location rows and scattering a household's
+        members between them. The ward still sits UNDER a constituency in the tree; that
+        parentage just does not participate in its identity.
         """
         parts = [self.clean_text(self.resolve_path(row, f"location/{level}"))
-                 for level in ("district", "ward", "cwac")]
+                 for level in ("district", "ward")]
         parts = [str(p) for p in parts if p]
         if not parts:
             return None

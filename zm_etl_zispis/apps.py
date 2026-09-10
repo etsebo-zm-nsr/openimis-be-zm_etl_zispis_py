@@ -29,12 +29,15 @@ ZISPIS_FIELD_MAP = {
     "dob": "dateOfBirth",
     # openIMIS resolves an individual's location by joining tblLocations on
     # LocationName AND LocationCode with LocationType='V', so whatever is mapped here
-    # has to be the VILLAGE level. CWAC is ZISPIS's finest grain, so that is the only
-    # candidate; `ward` sits a level above and is kept below as a plain attribute.
-    # `location_code` is NOT mapped - ZISPIS has no location code, and reusing the name
-    # as the code lets two same-named CWACs under different wards both satisfy the join,
-    # which duplicates the individual. ZispisAdapter derives a qualified code instead.
-    "location_name": "location/cwac",
+    # has to occupy the VILLAGE tier. ZISPIS has five administrative levels to
+    # openIMIS's four; CWAC is out of scope, so the tiers line up exactly:
+    #
+    #     province -> R      district -> D      constituency -> W      ward -> V
+    #
+    # `location_code` is NOT mapped - ZISPIS publishes no location code, and reusing the
+    # name as the code lets two same-named wards in different districts both satisfy the
+    # join, which duplicates the individual. ZispisAdapter derives a qualified code.
+    "location_name": "location/ward",
 
     # -- harmonized - present on BOTH the NSR and ZISPIS sides of the workbook --
     "sex": "gender",
@@ -63,6 +66,8 @@ ZISPIS_FIELD_MAP = {
 
     # -- ZISPIS-specific - geography and dwelling --
     "acc": "location/acc",
+    # Kept as an attribute, NOT as a tier: CWAC is out of scope for the location tree
+    # (2026-09-09) but the value is still information the registry should hold.
     "cwac": "location/cwac",
     "street_name": "location/address/street",
     "house_number": "location/address/houseNumber",
