@@ -125,7 +125,11 @@ class ZispisAdapter(BaseMappingAdapter):
             return mapped_dob, DOB_REPORTED
         year = self.resolve_path(row, "yearOfBirth")
         try:
-            year = int(str(year).strip()[:4])
+            # The WHOLE value must be a plausible year. Taking the first four digits
+            # would turn the observed yearOfBirth 19895989 into a confident-looking
+            # 1989 - a birth year invented by truncation, indistinguishable downstream
+            # from one the source actually reported.
+            year = int(str(year).strip())
         except (TypeError, ValueError):
             return None, DOB_REPORTED
         derived = self.parse_date(f"{year}{DERIVED_DOB_MONTH_DAY}")
