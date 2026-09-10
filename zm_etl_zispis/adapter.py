@@ -105,8 +105,17 @@ class ZispisAdapter(BaseMappingAdapter):
         ZISPIS confirmed that records with no usable date of birth must still be
         registered - historical data predating CORE MIS often lacks one - but
         `individual_individual.dob` is NOT NULL, so "no date" is not representable.
-        `yearOfBirth` is populated on 100% of sampled records and covers 98% of the
-        unusable dates, so it is the honest fallback.
+
+        MEASURED, and it is not what it looks like: `yearOfBirth` is NOT an independent
+        field. It equals `year(dateOfBirth)` on 99.6% of 5,000 sampled records, and
+        where the date is corrupt the year carries the same corruption - dateOfBirth
+        `6012-06-04` has yearOfBirth 6012, `0006-07-08` has 6, and one record has
+        19895989. So on current ZISPIS data this fallback rescues **0%** of the 3% of
+        records whose date is unusable; they still cannot be represented.
+
+        The path is kept because it is what was agreed and it costs nothing: if ZISPIS
+        populates yearOfBirth independently, or another source does, it works. It is not
+        a solution to the 3% today - see the ZISPIS doc for the open decision.
 
         The provenance column exists because a derived date must never be mistaken for a
         reported one: it is accurate to within a year, which is fine for age banding and
