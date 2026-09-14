@@ -27,16 +27,16 @@ ZISPIS_FIELD_MAP = {
     "first_name": "firstName",
     "last_name": "lastName",
     "dob": "dateOfBirth",
-    # openIMIS resolves an individual's location by joining tblLocations on
-    # LocationName AND LocationCode with LocationType='V', so whatever is mapped here
-    # has to occupy the VILLAGE tier. ZISPIS has five administrative levels to
-    # openIMIS's four; CWAC is out of scope, so the tiers line up exactly:
+    # ZISPIS has five administrative levels to openIMIS's four; CWAC is out of scope,
+    # so the tiers line up exactly:
     #
     #     province -> R      district -> D      constituency -> W      ward -> V
     #
-    # `location_code` is NOT mapped - ZISPIS publishes no location code, and reusing the
-    # name as the code lets two same-named wards in different districts both satisfy the
-    # join, which duplicates the individual. ZispisAdapter derives a qualified code.
+    # `location_name` is mapped for completeness but BOTH it and `location_code` are
+    # overwritten by the core's location resolver, which looks the ward up in the tree
+    # loaded from the official GEO file (see adapter.location_match_fields below).
+    # openIMIS matches on name AND code together, so both must come from that tree
+    # rather than one from ZISPIS and one derived from it.
     "location_name": "location/ward",
 
     # -- harmonized - present on BOTH the NSR and ZISPIS sides of the workbook --
@@ -212,6 +212,17 @@ DEFAULT_CONFIG = {
         # left open so a deployment can narrow it from the admin without a code change.
         # e.g. {"status": ["ACTIVE"]} to import only active beneficiaries.
         "include_when": {},
+        # Resolve the ward against the loaded gazetteer. ZISPIS sends names only.
+        # `province` is deliberately absent: a district name implies its province, and
+        # ZISPIS still carries the pre-boundary-change province for CHIRUNDU,
+        # ITEZHI-TEZHI and CHAMA - 92 records in a 5,000 sample. Matching from district
+        # down ignores that disagreement instead of failing on it.
+        "location_match_fields": ["district", "constituency", "ward"],
+        # Spellings ZISPIS uses that the gazetteer does not, e.g.
+        #     {"district": {"CHIENGI": "CHIENGE"}, "ward": {"NYALA": "NYAALA"}}
+        # Left empty deliberately: each entry asserts that two names are the same place,
+        # which is the data owner's call, not ours. Populate once confirmed.
+        "location_aliases": {},
     },
     "sink": {
         "lookup_field": "json_ext__external_id",
