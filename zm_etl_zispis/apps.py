@@ -177,14 +177,23 @@ DEFAULT_CONFIG = {
         "role_map": {
             "HEAD": "HEAD",
             "HUSBAND_OR_WIFE": "SPOUSE",
+            # HUSBAND is not gender-ambiguous like HUSBAND_OR_WIFE, so it belongs here
+            # rather than in ZispisAdapter.GENDERED_ROLES.
+            "HUSBAND": "SPOUSE",
             "NON_RELATIVE": "NOT_RELATED",
             "DAUGHTER": "DAUGHTER",
             "NEPHEW_OR_NIECE": "OTHER_RELATIVE",
+            "NIECE": "OTHER_RELATIVE",
             "COUSIN": "OTHER_RELATIVE",
             "STEPCHILD": "OTHER_RELATIVE",
             "BROTHER_IN_LAW_OR_SISTER_IN_LAW": "OTHER_RELATIVE",
             "SON_IN_LAW_OR_DAUGHTER_IN_LAW": "OTHER_RELATIVE",
+            "FATHER_IN_LAW_OR_MOTHER_IN_LAW": "OTHER_RELATIVE",
+            "UNCLE_OR_AUNT": "OTHER_RELATIVE",
             "OTHER_RELATIVE": "OTHER_RELATIVE",
+            # OTHER is deliberately left unmapped: raw ZISPIS "OTHER" is ambiguous
+            # between an other relative and a non-relative household member, so it
+            # falls through to adapter.default_role rather than guessing which.
         },
         # ZISPIS names one recipient per household via householdRole == HEAD.
         "recipient_field": "householdRole",
