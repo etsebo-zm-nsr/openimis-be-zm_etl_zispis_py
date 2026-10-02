@@ -122,6 +122,12 @@ class CorruptYearOfBirthTestCase(TestCase):
         self.assertEqual(record["dob_source"], "reported")
         self.assertEqual(record["year_of_birth"], 1985)
 
+    def test_corrupt_year_cleared_even_when_dob_reported(self):
+        record = self._transform(dateOfBirth="1985-03-12", yearOfBirth=19895989)
+        self.assertEqual(record["dob_source"], "reported")
+        self.assertEqual(record["dob"], "1985-03-12")
+        self.assertIsNone(record["year_of_birth"])
+
 
 class RoleMapTestCase(TestCase):
     """DEFAULT_CONFIG.adapter.role_map coverage for raw ZISPIS roles.

@@ -157,12 +157,12 @@ class ZispisAdapter(BaseMappingAdapter):
             return None
 
         record["dob"], record["dob_source"] = self.resolve_dob(row, record.get("dob"))
-        if record["dob_source"] != DOB_REPORTED or not record["dob"]:
-            # year_of_birth feeds the identity key. Where the date was not reported the
-            # year is usually the same corruption (6012), so keep it only if plausible.
-            # An age-based estimate is +-1 year and is deliberately not written here.
-            if not self._plausible_year(record.get("year_of_birth")):
-                record["year_of_birth"] = None
+        # year_of_birth feeds the identity key, so it is kept only if plausible. That
+        # holds even when the date was reported: about 0.4% of records carry a corrupt
+        # yearOfBirth (19895989) next to a valid dateOfBirth. An age-based estimate is
+        # +-1 year and is deliberately not written here.
+        if not self._plausible_year(record.get("year_of_birth")):
+            record["year_of_birth"] = None
 
         national_id, note = self.clean_national_id(self.resolve_path(row, "nationalId"))
         record["national_id"] = self.normalise_national_id(national_id)
