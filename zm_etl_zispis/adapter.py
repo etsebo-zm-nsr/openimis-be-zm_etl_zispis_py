@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 # `gender` resolves them, and this covers 90% of the roster: SON_OR_DAUGHTER and
 # GRANDCHILD alone are ~52% of all records.
 GENDERED_ROLES = {
-    "SON_OR_DAUGHTER":   {"MALE": "SON", "FEMALE": "DAUGHTER"},
-    "GRANDCHILD":        {"MALE": "GRANDSON", "FEMALE": "GRANDDAUGHTER"},
+    "SON_OR_DAUGHTER": {"MALE": "SON", "FEMALE": "DAUGHTER"},
+    "GRANDCHILD": {"MALE": "GRANDSON", "FEMALE": "GRANDDAUGHTER"},
     "BROTHER_OR_SISTER": {"MALE": "BROTHER", "FEMALE": "SISTER"},
-    "FATHER_OR_MOTHER":  {"MALE": "FATHER", "FEMALE": "MOTHER"},
-    "GRANDPARENT":       {"MALE": "GRANDFATHER", "FEMALE": "GRANDMOTHER"},
+    "FATHER_OR_MOTHER": {"MALE": "FATHER", "FEMALE": "MOTHER"},
+    "GRANDPARENT": {"MALE": "GRANDFATHER", "FEMALE": "GRANDMOTHER"},
 }
 
 # ZISPIS marks its own known-duplicate identities inside the national ID field rather
@@ -28,6 +28,7 @@ GENDERED_ROLES = {
 # merges two different human beings.
 DUPLICATE_SUFFIX = "/DUPLICATE"
 PLACEHOLDER_ID_PREFIX = "999999"
+
 
 class ZispisAdapter(BaseMappingAdapter):
 
