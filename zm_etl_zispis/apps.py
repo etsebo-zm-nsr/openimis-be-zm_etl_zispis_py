@@ -41,10 +41,15 @@ ZISPIS_FIELD_MAP = {
 
     # -- harmonized - present on BOTH the NSR and ZISPIS sides of the workbook --
     "sex": "gender",
-    # ZISPIS uses yearOfBirth to derive age; `age` itself is a frozen snapshot from
-    # registration. Imported because it is the fallback when dateOfBirth is unusable
-    # (see ZispisAdapter.resolve_dob) and a component of the identity key.
+    # `yearOfBirth` is a component of the identity key.
     "year_of_birth": "yearOfBirth",
+    # `age` is a frozen snapshot of the person's age AT REGISTRATION, and `createdAt` is
+    # when they were registered. Both are stored exactly as sent. Nothing is computed
+    # from them: the registry never generates a date of birth (see
+    # ZispisAdapter.resolve_dob), so a person with no usable dateOfBirth has dob NULL and
+    # these two are what a caseworker has to go on.
+    "age": "age",
+    "registered_at": "createdAt",
     # ACTIVE / SUSPENDED / GRADUATED. A suspended head is still a member of the
     # household but the household is no longer paid, so this is not cosmetic.
     "status": "status",
@@ -203,9 +208,11 @@ DEFAULT_CONFIG = {
         # ~2% of dateOfBirth values are impossible (years 0002, 0005, 1091). Those
         # resolve to None rather than being asserted as fact.
         "min_year": 1900,
-        # ZispisAdapter attaches this in code, to flagged rows only. Declared so
-        # `etl_check_schema` counts it - see the adapter's clean_national_id().
-        "extra_columns": ["data_quality_note", "dob_source"],
+        # ZispisAdapter attaches these in code, to flagged rows only:
+        # `data_quality_note` (see clean_national_id) and `dob_as_sent` (the raw
+        # dateOfBirth, when it was sent but unusable). Declared so `etl_check_schema`
+        # counts them.
+        "extra_columns": ["data_quality_note", "dob_as_sent"],
         # WHAT COUNTS AS THE SAME PERSON - defined here and nowhere else.
         # Measured over 5,000 live records (collision = two different source records
         # sharing the key):
