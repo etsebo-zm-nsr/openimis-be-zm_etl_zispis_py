@@ -48,3 +48,18 @@ class ResolveDobTestCase(TestCase):
         """A 1 January cluster reads as fact and skews age-banded targeting."""
         dob, _ = self._adapter().resolve_dob({"yearOfBirth": 2000}, None)
         self.assertTrue(dob.endswith("-07-01"))
+
+
+class RoleMapTestCase(TestCase):
+    """DEFAULT_CONFIG.adapter.role_map coverage for raw ZISPIS roles.
+
+    Measured against the live pull: UNCLE_OR_AUNT (295), FATHER_IN_LAW_OR_MOTHER_IN_LAW
+    (115), NIECE (6) and HUSBAND (1) were all silently falling through to
+    adapter.default_role, unmapped.
+    """
+
+    def _adapter(self):
+        return ZispisAdapter(build_source_config("zispis", DEFAULT_CONFIG))
+
+    def test_husband_maps_to_spouse(self):
+        self.assertEqual(self._adapter().map_role("HUSBAND"), "SPOUSE")
