@@ -5,6 +5,7 @@ from api_etl.config import build_source_config
 from zm_etl_zispis.adapter import ZispisAdapter
 from zm_etl_zispis.apps import DEFAULT_CONFIG
 
+
 def _adapter():
     return ZispisAdapter(build_source_config("zispis", DEFAULT_CONFIG))
 
